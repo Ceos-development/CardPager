@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ceos.kwallet.tools.extensions.setSaturation
 
+//Reference:https://medium.com/deuk/intermediate-android-compose-bank-card-ui-371d14ea7843
 @Composable
 fun BankCardUi(
     modifier: Modifier = Modifier,

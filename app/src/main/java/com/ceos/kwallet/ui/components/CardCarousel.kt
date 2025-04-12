@@ -30,7 +30,7 @@ import kotlin.math.sin
 fun rememberCardCarouselState(): CardCarouselState = remember {
     CardCarouselStateImpl()
 }
-
+//https://fvilarino.medium.com/implementing-a-circular-carousel-in-jetpack-compose-cc46f2733ca7
 @Composable
 fun CardCarousel(modifier: Modifier = Modifier,
                  state: CardCarouselState = rememberCardCarouselState(),
