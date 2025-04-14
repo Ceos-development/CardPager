@@ -1,13 +1,14 @@
 package com.ceos.kwallet.ui.components
 
+import android.util.Log
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.calculateTargetValue
 import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -19,6 +20,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -30,21 +32,25 @@ import kotlin.math.sin
 fun rememberCardCarouselState(): CardCarouselState = remember {
     CardCarouselStateImpl()
 }
+
 //https://fvilarino.medium.com/implementing-a-circular-carousel-in-jetpack-compose-cc46f2733ca7
 @Composable
-fun CardCarousel(modifier: Modifier = Modifier,
-                 state: CardCarouselState = rememberCardCarouselState(),
-                 cardRender: @Composable (index: Int) -> Unit) {
+fun CardCarousel(
+    modifier: Modifier = Modifier,
+    state: CardCarouselState = rememberCardCarouselState(),
+    cardRender: @Composable (index: Int) -> Unit
+) {
     val numberOfCards = 4
-    val itemFraction = 0.75 //We are calculating how tall an item can be, based on the overall height of the composable and the fraction we receive as argument.
+    val itemFraction =
+        0.75 //We are calculating how tall an item can be, based on the overall height of the composable and the fraction we receive as argument.
     val cardAspectRatio = 1.586f //width:height ratio of the card
     Layout(
-        modifier = modifier
-            .drag(state),
+        modifier = modifier.swipe(state),
         content = {
             val angleStep = 360f / numberOfCards.toFloat()
             repeat(numberOfCards) { index ->
                 val itemAngle = (state.angle + angleStep * index.toFloat()).normalizeAngle()
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -65,7 +71,8 @@ fun CardCarousel(modifier: Modifier = Modifier,
             }
         }
     ) { measurables, constraints ->
-        val itemWidth = constraints.maxWidth*itemFraction
+        state.setSwipeableZoneWidth(constraints.maxWidth.toFloat())
+        val itemWidth = constraints.maxWidth * itemFraction
         val itemHeight = itemWidth / cardAspectRatio
         val itemConstraints = Constraints.fixed(
             width = itemWidth.toInt(),//* cardAspectRatio,
@@ -81,10 +88,11 @@ fun CardCarousel(modifier: Modifier = Modifier,
             val verticalOffset = (constraints.maxHeight - itemHeight).toInt() / 2
             val angleStep = 2.0 * PI / numberOfCards.toDouble()
             placeables.forEachIndexed { index, placeable ->
-                val itemAngle = (state.angle.toDouble().degreesToRadians() + (angleStep * index.toDouble())) % 360.0
+                val itemAngle = (state.angle.toDouble()
+                    .degreesToRadians() + (angleStep * index.toDouble())) % 360.0
                 val offset = getCoordinates(
                     width = availableHorizontalSpace / 2.0,
-                    height =  (constraints.maxHeight.toDouble() / 2.0 ) * state.minorAxisFactor,
+                    height = (constraints.maxHeight.toDouble() / 2.0) * state.minorAxisFactor,
                     angle = itemAngle,
                 )
                 placeable.placeRelative(
@@ -96,7 +104,9 @@ fun CardCarousel(modifier: Modifier = Modifier,
     }
 }
 
-private fun Float.normalizeAngle(): Float = (this % 360f).let { angle -> if (this < 0f) 360f + angle else angle }
+private fun Float.normalizeAngle(): Float =
+    (this % 360f).let { angle -> if (this < 0f) 360f + angle else angle }
+
 private fun Double.degreesToRadians(): Double = this / 360.0 * 2.0 * PI
 private fun getCoordinates(width: Double, height: Double, angle: Double): Offset {
     val x = width * sin(angle)
@@ -105,6 +115,38 @@ private fun getCoordinates(width: Double, height: Double, angle: Double): Offset
         x = x.toFloat(),
         y = y.toFloat(),
     )
+}
+
+private fun Modifier.swipe(
+    state: CardCarouselState
+) = pointerInput(Unit) {
+    val decay = splineBasedDecay<Float>(this)
+    coroutineScope {
+        while (true) {
+            val pointerInput = awaitPointerEventScope { awaitFirstDown() }
+            state.stop()
+            val tracker = VelocityTracker()
+            
+            awaitPointerEventScope {
+                horizontalDrag(pointerInput.id) { change ->
+                    val horizontalDragOffset = change.positionChange().x
+                    launch {
+                        state.dragging(horizontalDragOffset)
+                    }
+                    tracker.addPosition(change.uptimeMillis, change.position)
+                    if (change.positionChange() != Offset.Zero) change.consume()
+                }
+                val velocity = tracker.calculateVelocity().x
+                val targetOffset = decay.calculateTargetValue(
+                    state.dragOffset,
+                    velocity ,
+                )
+                launch {
+                   state.draggingStop(targetOffset,velocity)
+                }
+            }
+        }
+    }
 }
 
 private fun Modifier.drag(
@@ -119,7 +161,8 @@ private fun Modifier.drag(
             val degreesPerPixel = 180f / size.width.toFloat()
             awaitPointerEventScope {
                 horizontalDrag(pointerInput.id) { change ->
-                    val horizontalDragOffset = state.angle + change.positionChange().x * degreesPerPixel
+                    val horizontalDragOffset =
+                        state.angle + change.positionChange().x * degreesPerPixel
                     launch {
                         state.snapTo(horizontalDragOffset)
                     }

@@ -4,15 +4,26 @@ import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FloatSpringSpec
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlin.properties.Delegates
 
-class CardCarouselStateImpl(eccentricity: Float = 0F) : CardCarouselState {
+class CardCarouselStateImpl(eccentricity: Float = 0F) :
+    CardCarouselState {
+    private var currentIndex = 0
+    private var maxWidth by Delegates.notNull<Float>()
     private val _angle = Animatable(0f)
     private val _eccentricity = mutableFloatStateOf(eccentricity)
+    private val _dragOffset = mutableFloatStateOf(0f)
 
     override val angle: Float
         get() = _angle.value
+
+    override val dragOffset: Float
+        get() = _dragOffset.floatValue
 
     override val minorAxisFactor: Float
         get() = _eccentricity.floatValue
@@ -40,5 +51,42 @@ class CardCarouselStateImpl(eccentricity: Float = 0F) : CardCarouselState {
 
     override fun setMinorAxisFactor(factor: Float) {
         _eccentricity.floatValue = factor.coerceIn(-1f, 1f)
+    }
+
+    override suspend fun dragging(offset: Float) {
+        _dragOffset.floatValue += offset
+
+        val degreesPerPixel = 180f / maxWidth
+        val maxBound = (currentIndex + 1) * 90F
+        val minBound = -1 * maxBound
+        val d = (dragOffset * degreesPerPixel).coerceIn(minBound, maxBound)
+        Log.d("YAKAMOTO", "dragging{$currentIndex}: $d")
+        _angle.snapTo(d + (currentIndex * -90F))
+    }
+
+    override suspend fun draggingStop(targetDrag: Float, velocity: Float) {
+        val degreesPerPixel = 180f / maxWidth
+        val draggedDegrees = _dragOffset.floatValue * degreesPerPixel
+        Log.d("YAKAMOTO", "draggingStop: $draggedDegrees")
+
+        if (abs(draggedDegrees) >= 45) {
+            currentIndex++
+        }
+        animateToIndex(currentIndex, velocity)
+        _dragOffset.floatValue = 0f
+    }
+
+    private suspend fun animateToIndex(index: Int, velocity: Float) {
+        _angle.animateTo(
+            targetValue = (index * -90F).also {
+                Log.d("YAKAMOTO", "animateToIndex: $it")
+            },
+            initialVelocity = velocity,
+            animationSpec = tween()
+        )
+    }
+
+    override fun setSwipeableZoneWidth(width: Float) {
+        maxWidth = width
     }
 }
