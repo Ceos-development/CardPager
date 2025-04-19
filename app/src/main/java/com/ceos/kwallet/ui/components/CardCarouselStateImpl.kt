@@ -11,7 +11,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.properties.Delegates
 
-class CardCarouselStateImpl(eccentricity: Float = 0F) :
+class CardCarouselStateImpl(eccentricity: Float = 0F, override val count: Int) :
     CardCarouselState {
     private var currentIndex = 0
     private var maxWidth by Delegates.notNull<Float>()
@@ -60,27 +60,26 @@ class CardCarouselStateImpl(eccentricity: Float = 0F) :
         val maxBound = (currentIndex + 1) * 90F
         val minBound = -1 * maxBound
         val d = (dragOffset * degreesPerPixel).coerceIn(minBound, maxBound)
-        Log.d("YAKAMOTO", "dragging{$currentIndex}: $d")
         _angle.snapTo(d + (currentIndex * -90F))
     }
 
     override suspend fun draggingStop(targetDrag: Float, velocity: Float) {
         val degreesPerPixel = 180f / maxWidth
         val draggedDegrees = _dragOffset.floatValue * degreesPerPixel
-        Log.d("YAKAMOTO", "draggingStop: $draggedDegrees")
 
-        if (abs(draggedDegrees) >= 45) {
-            currentIndex++
+        if (draggedDegrees <= -45) {
+            currentIndex = currentIndex.plus(1).coerceAtMost(count)
+        } else if (draggedDegrees >= 45) {
+            currentIndex = currentIndex.minus(1).coerceAtLeast(0)
         }
+
         animateToIndex(currentIndex, velocity)
         _dragOffset.floatValue = 0f
     }
 
     private suspend fun animateToIndex(index: Int, velocity: Float) {
         _angle.animateTo(
-            targetValue = (index * -90F).also {
-                Log.d("YAKAMOTO", "animateToIndex: $it")
-            },
+            targetValue = (index * -90F),
             initialVelocity = velocity,
             animationSpec = tween()
         )

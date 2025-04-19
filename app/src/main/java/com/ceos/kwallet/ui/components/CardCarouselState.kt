@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.IntOffset
 
 @Stable
 interface CardCarouselState {
+    val count:Int
     val angle: Float
     val dragOffset: Float
     val minorAxisFactor: Float

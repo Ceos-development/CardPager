@@ -1,11 +1,9 @@
 package com.ceos.kwallet.ui.components
 
 import android.util.Log
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.calculateTargetValue
 import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,30 +18,32 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.zIndex
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
-fun rememberCardCarouselState(): CardCarouselState = remember {
-    CardCarouselStateImpl()
+fun rememberCardCarouselState(count:Int): CardCarouselState = remember {
+    CardCarouselStateImpl(count = count)
 }
 
 //https://fvilarino.medium.com/implementing-a-circular-carousel-in-jetpack-compose-cc46f2733ca7
 @Composable
 fun CardCarousel(
     modifier: Modifier = Modifier,
-    state: CardCarouselState = rememberCardCarouselState(),
+    state: CardCarouselState = rememberCardCarouselState(6),
     cardRender: @Composable (index: Int) -> Unit
 ) {
     val numberOfCards = 4
     val itemFraction =
         0.75 //We are calculating how tall an item can be, based on the overall height of the composable and the fraction we receive as argument.
     val cardAspectRatio = 1.586f //width:height ratio of the card
+
+
     Layout(
         modifier = modifier.swipe(state),
         content = {
@@ -66,7 +66,11 @@ fun CardCarousel(
                             scaleY = scale
                         }
                 ) {
-                    cardRender(index)
+                    val indexRotation = (((-state.angle) - (index * 90.0)) / 360).roundToInt()
+                    val adjustedIndex = (indexRotation * 4) + index
+
+                    if (adjustedIndex in (0..state.count))
+                        cardRender(adjustedIndex)
                 }
             }
         }
@@ -75,7 +79,7 @@ fun CardCarousel(
         val itemWidth = constraints.maxWidth * itemFraction
         val itemHeight = itemWidth / cardAspectRatio
         val itemConstraints = Constraints.fixed(
-            width = itemWidth.toInt(),//* cardAspectRatio,
+            width = itemWidth.toInt(),
             height = itemHeight.toInt(),
         )
         val placeables = measurables.map { measurable -> measurable.measure(itemConstraints) }
@@ -126,7 +130,7 @@ private fun Modifier.swipe(
             val pointerInput = awaitPointerEventScope { awaitFirstDown() }
             state.stop()
             val tracker = VelocityTracker()
-            
+
             awaitPointerEventScope {
                 horizontalDrag(pointerInput.id) { change ->
                     val horizontalDragOffset = change.positionChange().x
@@ -139,10 +143,10 @@ private fun Modifier.swipe(
                 val velocity = tracker.calculateVelocity().x
                 val targetOffset = decay.calculateTargetValue(
                     state.dragOffset,
-                    velocity ,
+                    velocity,
                 )
                 launch {
-                   state.draggingStop(targetOffset,velocity)
+                    state.draggingStop(targetOffset, velocity)
                 }
             }
         }
