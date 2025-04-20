@@ -2,22 +2,45 @@ package com.ceos.kwallet.ui.components
 
 import android.util.Log
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FloatSpringSpec
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.roundToInt
 import kotlin.properties.Delegates
 
-class CardCarouselStateImpl(eccentricity: Float = 0F, override val count: Int) :
-    CardCarouselState {
-    private var currentIndex = 0
-    private var maxWidth by Delegates.notNull<Float>()
+@Composable
+fun rememberCardCarouselState(
+    count: Int,
+    carouselSize: Int = 4,
+    onCurrentIndexChange: (currentIndex: Int) -> Unit = {},
+): CardCarouselState = remember {
+    CardCarouselStateImpl(
+        initialIndex = 0,
+        count = count,
+        carouselSize = carouselSize,
+        onCurrentIndexChange = onCurrentIndexChange,
+    )
+}
+
+internal class CardCarouselStateImpl(
+    val initialIndex: Int,
+    override val count: Int,
+    override val carouselSize: Int,
+    onCurrentIndexChange: (currentIndex: Int) -> Unit,
+) : CardCarouselState {
+    private var _currentIndex: Int by Delegates.observable(initialIndex) { _, _, new ->
+        onCurrentIndexChange.invoke(new)
+    }
+    private var _maxWidth by Delegates.notNull<Float>()
     private val _angle = Animatable(0f)
-    private val _eccentricity = mutableFloatStateOf(eccentricity)
     private val _dragOffset = mutableFloatStateOf(0f)
+    private val _angleStepTrigger = stepAngle * 0.5F
+    override val currentIndex: Int
+        get() = _currentIndex
 
     override val angle: Float
         get() = _angle.value
@@ -25,52 +48,32 @@ class CardCarouselStateImpl(eccentricity: Float = 0F, override val count: Int) :
     override val dragOffset: Float
         get() = _dragOffset.floatValue
 
-    override val minorAxisFactor: Float
-        get() = _eccentricity.floatValue
-
-    private val decayAnimationSpec = FloatSpringSpec(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessVeryLow,
-    )
+    init {
+        onCurrentIndexChange.invoke(initialIndex)
+    }
 
     override suspend fun stop() {
         _angle.stop()
     }
 
-    override suspend fun snapTo(angle: Float) {
-        _angle.snapTo(angle)
-    }
-
-    override suspend fun decayTo(angle: Float, velocity: Float) {
-        _angle.animateTo(
-            targetValue = angle,
-            initialVelocity = velocity,
-            animationSpec = decayAnimationSpec,
-        )
-    }
-
-    override fun setMinorAxisFactor(factor: Float) {
-        _eccentricity.floatValue = factor.coerceIn(-1f, 1f)
-    }
+    private fun getDegreeByPixel() = 180f / _maxWidth
 
     override suspend fun dragging(offset: Float) {
         _dragOffset.floatValue += offset
 
-        val degreesPerPixel = 180f / maxWidth
-        val maxBound = (currentIndex + 1) * 90F
+        val maxBound = (currentIndex + 1) * stepAngle
         val minBound = -1 * maxBound
-        val d = (dragOffset * degreesPerPixel).coerceIn(minBound, maxBound)
-        _angle.snapTo(d + (currentIndex * -90F))
+        val draggedDegrees = (dragOffset * getDegreeByPixel()).coerceIn(minBound, maxBound)
+        _angle.snapTo(draggedDegrees + (currentIndex * -stepAngle))
     }
 
     override suspend fun draggingStop(targetDrag: Float, velocity: Float) {
-        val degreesPerPixel = 180f / maxWidth
-        val draggedDegrees = _dragOffset.floatValue * degreesPerPixel
+        val draggedDegrees = _dragOffset.floatValue * getDegreeByPixel()
 
-        if (draggedDegrees <= -45) {
-            currentIndex = currentIndex.plus(1).coerceAtMost(count)
-        } else if (draggedDegrees >= 45) {
-            currentIndex = currentIndex.minus(1).coerceAtLeast(0)
+        if (draggedDegrees <= -_angleStepTrigger) {
+            _currentIndex = currentIndex.plus(1).coerceAtMost(count - 1)
+        } else if (draggedDegrees >= _angleStepTrigger) {
+            _currentIndex = currentIndex.minus(1).coerceAtLeast(0)
         }
 
         animateToIndex(currentIndex, velocity)
@@ -79,13 +82,21 @@ class CardCarouselStateImpl(eccentricity: Float = 0F, override val count: Int) :
 
     private suspend fun animateToIndex(index: Int, velocity: Float) {
         _angle.animateTo(
-            targetValue = (index * -90F),
+            targetValue = (index * -stepAngle),
             initialVelocity = velocity,
             animationSpec = tween()
         )
     }
 
     override fun setSwipeableZoneWidth(width: Float) {
-        maxWidth = width
+        _maxWidth = width
     }
+
+    override val currentPageOffsetFractionFlow: Flow<Float>
+        get() = snapshotFlow {
+            this.dragOffset
+        }.map {
+            val draggedDegree = abs(it) * getDegreeByPixel()
+            (draggedDegree / stepAngle).coerceIn(0.0F, 1.0F)
+        }
 }
