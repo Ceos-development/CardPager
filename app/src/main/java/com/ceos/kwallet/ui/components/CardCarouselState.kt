@@ -10,7 +10,6 @@ import kotlin.math.abs
 
 @Stable
 interface CardCarouselState {
-    val currentIndex: Int
     val count: Int
     val carouselSize: Int
     val angle: Float
