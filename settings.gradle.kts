@@ -20,4 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "KWallet"
-include(":app")
+include(":cardpager")
+include(":sample")
