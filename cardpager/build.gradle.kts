@@ -1,6 +1,9 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    id("com.vanniktech.maven.publish") version "0.31.0"
 }
 
 android {
@@ -39,6 +42,7 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
     }
+
 }
 
 dependencies {
@@ -48,4 +52,48 @@ dependencies {
     implementation(libs.androidx.animation.core.android)
     implementation(libs.androidx.animation.android)
     implementation(libs.androidx.foundation.android)
+}
+
+mavenPublishing {
+    // Define coordinates for the published artifact
+    coordinates(
+        groupId = "com.ceosdevelopment",
+        artifactId = "card-pager",
+        version = "1.0.0"
+    )
+
+    // Configure POM metadata for the published artifact
+    pom {
+        name.set("Card Pager")
+        description.set("A component for displaying cards in a carousel effect.")
+        inceptionYear.set("2025")
+        url.set("https://github.com/Ceos-development/CardPager")
+
+        licenses {
+            license {
+                name.set("MIT")
+                url.set("https://opensource.org/licenses/MIT")
+            }
+        }
+
+        // Specify developers information
+        developers {
+            developer {
+                id.set("Ceos-development")
+                name.set("Ceos development")
+                email.set("jean.christophe.decary.ceos@gmail.com")
+            }
+        }
+
+        // Specify SCM information
+        scm {
+            url.set("https://github.com/Ceos-development/CardPager")
+        }
+    }
+
+    // Configure publishing to Maven Central
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+
+    // Enable GPG signing for all publications
+    signAllPublications()
 }
