@@ -17,11 +17,12 @@ import kotlin.properties.Delegates
 @Composable
 fun rememberCardPagerState(
     count: Int,
+    initialIndex: Int = 0,
     carouselSize: Int = 4,
     onCardIndexChange: (cardIndex: Int) -> Unit = {},
 ): CardPagerState = remember {
     CardPagerStateImpl(
-        initialIndex = 0,
+        initialIndex = initialIndex,
         count = count,
         carouselSize = carouselSize,
         onCardIndexChange = onCardIndexChange,
@@ -39,7 +40,7 @@ internal class CardPagerStateImpl(
         onCardIndexChange.invoke(new)
     }
     private var _maxWidth by Delegates.notNull<Float>()
-    private val _angle = Animatable(0f)
+    private val _angle = Animatable(_currentIndex * -stepAngle)
     private val _dragOffset = mutableFloatStateOf(0f)
     private val _angleStepTrigger = stepAngle * 0.5F
 

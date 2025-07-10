@@ -59,7 +59,7 @@ mavenPublishing {
     coordinates(
         groupId = "com.ceosdevelopment",
         artifactId = "card-pager",
-        version = "1.0.0"
+        version = "1.0.1"
     )
 
     // Configure POM metadata for the published artifact

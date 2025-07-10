@@ -48,18 +48,12 @@ class MainActivity : ComponentActivity() {
                                 "Current card index is: $cardIndex"
                             }
                         }
-                        val state = rememberCardPagerState(11)
-                        val alpha by state.currentPageOffsetFractionFlow.map {
-                            val alphaDelta = if (it <= 0.5F) {
-                                1 - (it / 0.5F)
-                            } else {
-                                (it - 0.5F) / 0.5F
-                            }
-                            alphaDelta
-                        }.collectAsState(1.0F)
+                        val state = rememberCardPagerState(11, initialIndex = 3){
+                            cardIndex = it
+                        }
                         CardPager(
                             modifier = Modifier.weight(1F),
-                            state = rememberCardPagerState(11)
+                            state = state
                         ) { index ->
                             BankCardUi(
                                 baseColor = colors[index % colors.size],
@@ -70,7 +64,7 @@ class MainActivity : ComponentActivity() {
                         Column(modifier = Modifier.weight(1F)) {
                             Text(
                                 subtitle,
-                                color = Color.Black.copy(alpha = alpha)
+                                color = Color.Black
                             )
                         }
                     }
